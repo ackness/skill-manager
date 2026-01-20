@@ -22,7 +22,6 @@
 .agent/skills/
 .github/skills/
 .factory/skills/
-skills/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

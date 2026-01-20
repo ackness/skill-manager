@@ -13,7 +13,6 @@ from .github import download_skill_from_github
 from .metadata import (
     list_updatable_skills,
     read_skill_metadata,
-    save_skill_metadata,
     update_skill_metadata,
 )
 

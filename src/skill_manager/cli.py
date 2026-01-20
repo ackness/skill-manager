@@ -27,6 +27,7 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
+from . import __version__
 from .agents import AGENTS, detect_existing_agents, get_agent_name, get_agent_path
 from .deployment import (
     deploy_multiple_skills,
@@ -41,7 +42,6 @@ from .metadata import (
     save_skill_metadata,
 )
 from .removal import (
-    clean_trash,
     hard_delete_skill,
     list_installed_skills,
     list_trashed_skills,
@@ -700,7 +700,7 @@ def cmd_uninstall() -> int:
             Panel.fit(
                 f"[bold green]✓ Uninstallation successful![/bold green]\n\n"
                 f"Removed {success_count} skills\n"
-                + (f"[dim]Skills moved to trash and can be restored with 'sm restore'[/dim]" if deletion_type == "soft" else ""),
+                + ("[dim]Skills moved to trash and can be restored with 'sm restore'[/dim]" if deletion_type == "soft" else ""),
                 border_style="green",
             )
         )
@@ -1129,10 +1129,15 @@ def main() -> int:
     Returns:
         Exit code
     """
+    # Handle version flag
+    if len(sys.argv) > 1 and sys.argv[1] in ("--version", "-v", "version"):
+        console.print(f"[cyan]agent-skill-manager[/cyan] version [bold]{__version__}[/bold]")
+        return 0
+
     if len(sys.argv) < 2:
         console.print(
             Panel.fit(
-                "[bold cyan]Skill Manager[/bold cyan]\n\n"
+                f"[bold cyan]Skill Manager[/bold cyan] [dim]v{__version__}[/dim]\n\n"
                 "Usage:\n"
                 "  sm download      - Download a skill from GitHub\n"
                 "  sm deploy        - Deploy local skills to agents\n"
@@ -1141,7 +1146,8 @@ def main() -> int:
                 "  sm restore       - Restore deleted skills from trash\n"
                 "  sm update        - Update skills from GitHub\n"
                 "  sm update --all  - Update all skills from GitHub\n"
-                "  sm list          - List installed skills and versions\n\n"
+                "  sm list          - List installed skills and versions\n"
+                "  sm --version     - Show version information\n\n"
                 "[dim]Note: You can also use 'skill-manager' instead of 'sm'[/dim]",
                 border_style="cyan",
             )
@@ -1167,7 +1173,7 @@ def main() -> int:
             return cmd_list()
         else:
             console.print(f"[red]Unknown command: {command}[/red]")
-            console.print("Available commands: download, deploy, install, uninstall, restore, update, list")
+            console.print("Available commands: download, deploy, install, uninstall, restore, update, list, --version")
             return 1
     except KeyboardInterrupt:
         console.print("\n[yellow]Cancelled[/yellow]")

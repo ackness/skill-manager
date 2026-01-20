@@ -8,7 +8,6 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-
 METADATA_FILENAME = ".skill_metadata.json"
 
 

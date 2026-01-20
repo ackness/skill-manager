@@ -1,5 +1,7 @@
 # Agent Skill Manager
 
+ALL codes are written by Claude Code.
+
 A comprehensive CLI tool for managing AI agent skills across multiple platforms. Download, deploy, update, and manage skills for AI coding assistants like Claude Code, Cursor, Windsurf, and more.
 
 [![PyPI version](https://badge.fury.io/py/agent-skill-manager.svg)](https://pypi.org/project/agent-skill-manager/)
@@ -34,40 +36,50 @@ A comprehensive CLI tool for managing AI agent skills across multiple platforms.
 
 ## Installation
 
-### Quick Run with uvx (No Installation Required)
+### Recommended: Install with uv tool
 
-Run directly without installing (recommended for trying it out):
-
-```bash
-# Show help (default command)
-uvx agent-skill-manager
-
-# Use sm command for specific operations
-uvx --from agent-skill-manager sm install
-uvx --from agent-skill-manager sm list
-uvx --from agent-skill-manager sm update --all
-
-# Or create an alias for convenience
-alias sm="uvx --from agent-skill-manager sm"
-sm install  # Now you can use it like the installed version
-```
-
-### Permanent Installation
+The best way to install is using `uv tool`:
 
 ```bash
-# Using uv (recommended)
+# Install from PyPI
 uv tool install agent-skill-manager
 
+# Verify installation
+sm --version
+
+# Start using
+sm install
+```
+
+**Why uv tool?**
+- Isolated environment (no package conflicts)
+- Easy updates: `uv tool upgrade agent-skill-manager`
+- Clean uninstall: `uv tool uninstall agent-skill-manager`
+- Works across all projects
+
+### Alternative: Run Without Installing
+
+For one-time use or testing:
+
+```bash
+# Run directly with uvx (no installation needed)
+uvx agent-skill-manager
+
+# Or run specific commands
+uvx --from agent-skill-manager sm install
+uvx --from agent-skill-manager sm list
+```
+
+### Other Installation Methods
+
+```bash
 # Using pip
 pip install agent-skill-manager
 
-# Using pipx (isolated installation)
+# Using pipx (isolated like uv tool)
 pipx install agent-skill-manager
-```
 
-### From Source
-
-```bash
+# From source (for development)
 git clone https://github.com/ackness/skill-manager.git
 cd skill-manager
 uv sync
@@ -110,6 +122,7 @@ sm uninstall       # Uninstall a skill (safe delete)
 | `sm update` | Update selected skills from GitHub |
 | `sm update --all` | Update all GitHub-sourced skills |
 | `sm list` | Show installed skills with versions |
+| `sm --version` / `sm -v` | Show version information |
 
 ## Usage Examples
 

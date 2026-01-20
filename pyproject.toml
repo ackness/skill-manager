@@ -1,15 +1,39 @@
 [project]
-name = "my-python-template"
-version = "0.1.0"
-description = "Add your description here"
+name = "agent-skill-manager"
+version = "0.1.1"
+description = "CLI tool for managing AI agent skills across multiple platforms"
 authors = [
     { name = "ackness", email = "ackness8@gmail.com" }
 ]
 dependencies = [
+    "httpx>=0.28.1",
+    "inquirerpy>=0.3.4",
     "loguru>=0.7.3",
+    "rich>=14.2.0",
 ]
 readme = "README.md"
 requires-python = ">= 3.13"
+license = { text = "MIT" }
+keywords = ["skills", "ai", "agents", "cli", "claude", "cursor", "windsurf"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Utilities",
+]
+
+[project.urls]
+Homepage = "https://github.com/ackness/skill-manager"
+Repository = "https://github.com/ackness/skill-manager"
+Issues = "https://github.com/ackness/skill-manager/issues"
+Documentation = "https://github.com/ackness/skill-manager#readme"
+
+[project.scripts]
+skill-manager = "skill_manager.cli:main"
+sm = "skill_manager.cli:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -23,7 +47,7 @@ dev-dependencies = []
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/my_python_template"]
+packages = ["src/skill_manager"]
 
 [dependency-groups]
 dev = [

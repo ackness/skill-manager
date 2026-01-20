@@ -1,3 +1,29 @@
+# env
+.claude/
+
+# Skill Manager temporary and metadata files
+.tmp_skills/
+.tmp_update/
+.trash/
+.backup/
+.skill_metadata.json
+*/.skill_metadata.json
+
+# AI Agent skill directories
+.cursor/skills/
+.windsurf/skills/
+.opencode/skills/
+.codex/skills/
+.agents/skills/
+.kilocode/skills/
+.roo/skills/
+.goose/skills/
+.gemini/skills/
+.agent/skills/
+.github/skills/
+.factory/skills/
+skills/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

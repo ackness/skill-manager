@@ -117,11 +117,13 @@ def list_updatable_skills(
         # Check for metadata
         metadata = read_skill_metadata(skill_dir)
         if metadata and metadata.get("source") == "github":
-            updatable_skills.append({
-                "skill_name": skill_dir.name,
-                "skill_path": skill_dir,
-                "metadata": metadata,
-            })
+            updatable_skills.append(
+                {
+                    "skill_name": skill_dir.name,
+                    "skill_path": skill_dir,
+                    "metadata": metadata,
+                }
+            )
 
     return sorted(updatable_skills, key=lambda x: x["skill_name"])
 

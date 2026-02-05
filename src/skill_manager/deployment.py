@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
 Skill deployment functionality.
-Handles copying skills to agent directories.
+Handles copying skills to agent directories with optional symlink support.
 """
 
+import os
 import shutil
 from collections.abc import Callable
 from pathlib import Path
@@ -15,6 +16,102 @@ from .metadata import (
     read_skill_metadata,
     update_skill_metadata,
 )
+
+
+def is_symlink_supported() -> bool:
+    """
+    Check if the current system supports symlinks.
+
+    On Windows, symlinks require admin privileges or developer mode.
+
+    Returns:
+        True if symlinks are supported, False otherwise
+    """
+    if os.name == "nt":
+        # Windows: test by trying to create a symlink
+        import tempfile
+
+        test_dir = Path(tempfile.gettempdir()) / ".symlink_test"
+        test_link = Path(tempfile.gettempdir()) / ".symlink_test_link"
+        try:
+            test_dir.mkdir(exist_ok=True)
+            if test_link.exists() or test_link.is_symlink():
+                test_link.unlink()
+            test_link.symlink_to(test_dir, target_is_directory=True)
+            test_link.unlink()
+            test_dir.rmdir()
+            return True
+        except OSError:
+            if test_dir.exists():
+                test_dir.rmdir()
+            return False
+    return True
+
+
+def create_symlink(source: Path, target: Path) -> bool:
+    """
+    Create a symlink from target to source.
+
+    Args:
+        source: The source directory (the actual skill)
+        target: The target path where the symlink will be created
+
+    Returns:
+        True if symlink was created successfully, False otherwise
+    """
+    try:
+        # Ensure target parent directory exists
+        target.parent.mkdir(parents=True, exist_ok=True)
+
+        # Remove existing target if present
+        if target.exists() or target.is_symlink():
+            if target.is_symlink():
+                target.unlink()
+            elif target.is_dir():
+                shutil.rmtree(target)
+            else:
+                target.unlink()
+
+        # Create symlink
+        target.symlink_to(source, target_is_directory=True)
+        return True
+    except OSError:
+        return False
+
+
+def remove_symlink(target: Path) -> bool:
+    """
+    Remove a symlink (or regular directory).
+
+    Args:
+        target: The symlink/directory to remove
+
+    Returns:
+        True if removed successfully, False otherwise
+    """
+    try:
+        if target.is_symlink():
+            target.unlink()
+        elif target.is_dir():
+            shutil.rmtree(target)
+        elif target.exists():
+            target.unlink()
+        return True
+    except OSError:
+        return False
+
+
+def is_skill_symlink(skill_path: Path) -> bool:
+    """
+    Check if a skill is deployed as a symlink.
+
+    Args:
+        skill_path: Path to the skill directory
+
+    Returns:
+        True if the skill is a symlink, False otherwise
+    """
+    return skill_path.is_symlink()
 
 
 def deploy_skill(
@@ -61,6 +158,7 @@ def deploy_skill_to_agents(
     agents: list[str],
     deployment_type: str = "global",
     project_root: Path | None = None,
+    use_symlink: bool = False,
 ) -> tuple[int, int]:
     """
     Deploy a skill directory to multiple agents.
@@ -72,6 +170,7 @@ def deploy_skill_to_agents(
         agents: List of agent IDs to deploy to
         deployment_type: Either "global" or "project"
         project_root: Project root directory (required for project deployment)
+        use_symlink: If True, create symlinks instead of copying
 
     Returns:
         Tuple of (success_count, failure_count)
@@ -89,12 +188,24 @@ def deploy_skill_to_agents(
             target_base.mkdir(parents=True, exist_ok=True)
 
             # Remove existing skill if present
-            if target_dir.exists():
-                shutil.rmtree(target_dir)
+            if target_dir.exists() or target_dir.is_symlink():
+                if target_dir.is_symlink():
+                    target_dir.unlink()
+                else:
+                    shutil.rmtree(target_dir)
 
-            # Copy the skill directory
-            shutil.copytree(skill_dir, target_dir)
-            success_count += 1
+            if use_symlink:
+                # Create symlink
+                if create_symlink(skill_dir.resolve(), target_dir):
+                    success_count += 1
+                else:
+                    # Fallback to copy if symlink fails
+                    shutil.copytree(skill_dir, target_dir)
+                    success_count += 1
+            else:
+                # Copy the skill directory
+                shutil.copytree(skill_dir, target_dir)
+                success_count += 1
         except Exception:
             fail_count += 1
 

@@ -5,18 +5,25 @@ This package provides functionality to download, deploy, and manage
 skills across different AI agent platforms.
 """
 
-__version__ = "0.1.3"
+__version__ = "0.2.0"
 
-from .agents import AGENTS, detect_existing_agents, get_agent_name, get_agent_path
+from .agents import AGENTS, detect_existing_agents, get_agent_name, get_agent_path, supports_global_deployment
 from .deployment import (
+    create_symlink,
     deploy_multiple_skills,
     deploy_skill,
     deploy_skill_to_agents,
+    is_skill_symlink,
+    is_symlink_supported,
+    remove_symlink,
     update_all_skills,
     update_skill,
 )
 from .github import (
+    discover_skills_in_repo,
+    download_multiple_skills,
     download_skill_from_github,
+    get_system_temp_dir,
     parse_github_url,
 )
 from .metadata import (
@@ -49,14 +56,22 @@ __all__ = [
     "detect_existing_agents",
     "get_agent_name",
     "get_agent_path",
+    "supports_global_deployment",
     # Deployment
     "deploy_skill",
     "deploy_skill_to_agents",
     "deploy_multiple_skills",
     "update_skill",
     "update_all_skills",
+    "is_symlink_supported",
+    "create_symlink",
+    "remove_symlink",
+    "is_skill_symlink",
     # GitHub
     "download_skill_from_github",
+    "download_multiple_skills",
+    "discover_skills_in_repo",
+    "get_system_temp_dir",
     "parse_github_url",
     # Metadata
     "save_skill_metadata",

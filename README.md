@@ -11,28 +11,69 @@ A comprehensive CLI tool for managing AI agent skills across multiple platforms.
 ## Features
 
 - 📥 **Download** skills from GitHub with metadata tracking
-- 🚀 **Deploy** skills to multiple AI agents (global or project-level)
-- 🔄 **Update** skills automatically from GitHub sources
+- � **Discover** all skills in a repository automatically
+- � **Deploy** skills to multiple AI agents (global or project-level)
+- � **Symlink** support - save disk space with symbolic links
+- � **Update** skills automatically from GitHub sources
 - 🗑️ **Uninstall** with safe deletion (move to trash) or hard delete
 - ♻️ **Restore** deleted skills from trash
 - 📋 **List** all installed skills with version information
+- ⚡ **CLI-first** - full command-line parameter support for automation
 
 ## Supported AI Agents
 
-- Claude Code
-- Cursor
-- Windsurf
-- OpenCode
-- GitHub Copilot
-- Goose
-- Gemini CLI
-- Roo Code
-- Kilo Code
-- Amp
-- Codex
-- Antigravity
-- Clawdbot
-- Droid
+<!-- supported-agents:start -->
+| Agent | `--agent` | Project Path | Global Path |
+|-------|-----------|--------------|-------------|
+| Amp, Kimi Code CLI | `amp`, `kimi-cli` | `.agents/skills/` | `~/.config/agents/skills/` |
+| Antigravity | `antigravity` | `.agent/skills/` | `~/.gemini/antigravity/skills/` |
+| Augment | `augment` | `.augment/rules/` | `~/.augment/rules/` |
+| Claude Code | `claude-code` | `.claude/skills/` | `~/.claude/skills/` |
+| OpenClaw | `openclaw` | `skills/` | `~/.moltbot/skills/` |
+| Cline | `cline` | `.cline/skills/` | `~/.cline/skills/` |
+| CodeBuddy | `codebuddy` | `.codebuddy/skills/` | `~/.codebuddy/skills/` |
+| Codex | `codex` | `.agents/skills/` | `~/.codex/skills/` |
+| Command Code | `command-code` | `.commandcode/skills/` | `~/.commandcode/skills/` |
+| Continue | `continue` | `.continue/skills/` | `~/.continue/skills/` |
+| Crush | `crush` | `.crush/skills/` | `~/.config/crush/skills/` |
+| Cursor | `cursor` | `.cursor/skills/` | `~/.cursor/skills/` |
+| Droid | `droid` | `.factory/skills/` | `~/.factory/skills/` |
+| Gemini CLI | `gemini-cli` | `.agents/skills/` | `~/.gemini/skills/` |
+| GitHub Copilot | `github-copilot` | `.agents/skills/` | `~/.copilot/skills/` |
+| Goose | `goose` | `.goose/skills/` | `~/.config/goose/skills/` |
+| Junie | `junie` | `.junie/skills/` | `~/.junie/skills/` |
+| iFlow CLI | `iflow-cli` | `.iflow/skills/` | `~/.iflow/skills/` |
+| Kilo Code | `kilo` | `.kilocode/skills/` | `~/.kilocode/skills/` |
+| Kiro CLI | `kiro-cli` | `.kiro/skills/` | `~/.kiro/skills/` |
+| Kode | `kode` | `.kode/skills/` | `~/.kode/skills/` |
+| MCPJam | `mcpjam` | `.mcpjam/skills/` | `~/.mcpjam/skills/` |
+| Mistral Vibe | `mistral-vibe` | `.vibe/skills/` | `~/.vibe/skills/` |
+| Mux | `mux` | `.mux/skills/` | `~/.mux/skills/` |
+| OpenCode | `opencode` | `.agents/skills/` | `~/.config/opencode/skills/` |
+| OpenHands | `openhands` | `.openhands/skills/` | `~/.openhands/skills/` |
+| Pi | `pi` | `.pi/skills/` | `~/.pi/agent/skills/` |
+| Qoder | `qoder` | `.qoder/skills/` | `~/.qoder/skills/` |
+| Qwen Code | `qwen-code` | `.qwen/skills/` | `~/.qwen/skills/` |
+| Replit | `replit` | `.agents/skills/` | N/A (project-only) |
+| Roo Code | `roo` | `.roo/skills/` | `~/.roo/skills/` |
+| Trae | `trae` | `.trae/skills/` | `~/.trae/skills/` |
+| Trae CN | `trae-cn` | `.trae/skills/` | `~/.trae-cn/skills/` |
+| Windsurf | `windsurf` | `.windsurf/skills/` | `~/.codeium/windsurf/skills/` |
+| Zencoder | `zencoder` | `.zencoder/skills/` | `~/.zencoder/skills/` |
+| Neovate | `neovate` | `.neovate/skills/` | `~/.neovate/skills/` |
+| Pochi | `pochi` | `.pochi/skills/` | `~/.pochi/skills/` |
+| AdaL | `adal` | `.adal/skills/` | `~/.adal/skills/` |
+<!-- supported-agents:end -->
+
+> [!NOTE]
+> **Kiro CLI users:** After installing skills, manually add them to your custom agent's `resources` in
+> `.kiro/agents/<agent>.json`:
+>
+> ```json
+> {
+>   "resources": ["skill://.kiro/skills/**/SKILL.md"]
+> }
+> ```
 
 ## Installation
 
@@ -103,34 +144,76 @@ uvx --from agent-skill-manager sm install
 uvx --from agent-skill-manager sm list
 
 # Or after installation, use sm command directly:
-sm install          # Install a skill from GitHub
-sm list            # List installed skills
-sm update --all    # Update all skills
-sm deploy          # Deploy local skills to agents
-sm uninstall       # Uninstall a skill (safe delete)
+sm install          # Install a skill from GitHub (interactive)
+sm list             # List installed skills
+sm update --all     # Update all skills
+sm deploy           # Deploy local skills to agents
+sm uninstall        # Uninstall a skill (safe delete)
+sm agents           # List all supported agents
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `sm download` | Download a skill from GitHub |
+| `sm install [url]` | Download and deploy skills (with discovery) |
+| `sm download [url]` | Download a skill from GitHub |
 | `sm deploy` | Deploy local skills to agents |
-| `sm install` | Download and deploy in one step |
+| `sm discover [url]` | Discover all skills in a repository |
 | `sm uninstall` | Remove skills (safe delete/hard delete) |
 | `sm restore` | Restore deleted skills from trash |
-| `sm update` | Update selected skills from GitHub |
-| `sm update --all` | Update all GitHub-sourced skills |
+| `sm update [--all]` | Update skills from GitHub |
 | `sm list` | Show installed skills with versions |
+| `sm agents` | List all supported agents |
 | `sm --version` / `sm -v` | Show version information |
+
+## CLI Options
+
+| Option | Description |
+|--------|-------------|
+| `-a, --agent AGENT` | Target agent(s), can be specified multiple times |
+| `-t, --type TYPE` | Deployment type: `global` (default) or `project` |
+| `-d, --dest PATH` | Custom destination directory for downloads |
+| `--symlink` | Use symlinks instead of copying files |
+| `--discover` | Discover and install all skills in repository |
+| `--no-deploy` | Download only, skip deployment |
+| `-y, --yes` | Skip confirmation prompts |
 
 ## Usage Examples
 
-### Install a skill from GitHub
+### Install all skills from a repository
+
+```bash
+# Discover and install all skills from a repository
+sm install https://github.com/cloudflare/skills --discover -a windsurf -a cursor
+
+# Use symlinks to save disk space (single source, multiple agents)
+sm install https://github.com/cloudflare/skills --discover --symlink -a windsurf
+```
+
+### Install a single skill with CLI options
+
+```bash
+# Full CLI mode - no prompts
+sm install https://github.com/user/repo/tree/main/skills/my-skill -a claude-code -t global
+
+# Download to custom location
+sm install https://github.com/user/repo/tree/main/skills/my-skill -d ./my-skills -a cursor
+```
+
+### Discover skills in a repository
+
+```bash
+# Scan a repository to find all skills
+sm discover https://github.com/cloudflare/skills
+# Shows a table of all found skills with their paths
+```
+
+### Interactive mode (legacy)
 
 ```bash
 sm install
-# Enter URL: https://github.com/user/repo/tree/main/skills/example-skill
+# Enter URL when prompted
 # Follow the prompts to save locally and deploy
 ```
 
@@ -161,6 +244,18 @@ sm uninstall
 # Restore if needed
 sm restore
 ```
+
+### Using symlinks
+
+Symlinks allow you to maintain a single copy of skills while deploying to multiple agents:
+
+```bash
+# Download skills to a central location and symlink to agents
+sm install https://github.com/cloudflare/skills --discover -d ~/skills --symlink -a windsurf -a cursor -a claude-code
+```
+
+> [!NOTE]
+> On Windows, symlinks require Developer Mode or administrator privileges. If symlinks are not supported, the tool will automatically fall back to copying.
 
 ## Version Tracking
 

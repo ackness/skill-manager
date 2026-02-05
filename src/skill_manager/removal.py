@@ -65,10 +65,7 @@ def soft_delete_skill(
         # Create metadata file
         metadata_file = trash_dest / ".trash_metadata"
         metadata_file.write_text(
-            f"deleted_at: {timestamp}\n"
-            f"original_path: {skill_dir}\n"
-            f"agent_id: {agent_id}\n"
-            f"deployment_type: {deployment_type}\n"
+            f"deleted_at: {timestamp}\noriginal_path: {skill_dir}\nagent_id: {agent_id}\ndeployment_type: {deployment_type}\n"
         )
 
         return True
@@ -149,12 +146,14 @@ def list_trashed_skills(
                     if line.startswith("deleted_at:"):
                         deleted_at = line.split(":", 1)[1].strip()
 
-            trashed_skills.append({
-                "skill_name": skill_dir.name,
-                "deleted_at": deleted_at,
-                "trash_path": skill_dir,
-                "timestamp_dir": timestamp_dir.name,
-            })
+            trashed_skills.append(
+                {
+                    "skill_name": skill_dir.name,
+                    "deleted_at": deleted_at,
+                    "trash_path": skill_dir,
+                    "timestamp_dir": timestamp_dir.name,
+                }
+            )
 
     return trashed_skills
 

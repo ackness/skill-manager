@@ -174,8 +174,8 @@ sm agents           # List all supported agents
 | `-a, --agent AGENT` | Target agent(s), can be specified multiple times |
 | `-t, --type TYPE` | Deployment type: `global` (default) or `project` |
 | `-d, --dest PATH` | Custom destination directory for downloads |
-| `--symlink` | Use symlinks instead of copying files |
-| `--discover` | Discover and install all skills in repository |
+| `--no-symlink` | Disable symlinks, copy files instead (symlinks on by default) |
+| `--no-discover` | Disable auto-discovery (on by default) |
 | `--no-deploy` | Download only, skip deployment |
 | `-y, --yes` | Skip confirmation prompts |
 
@@ -184,18 +184,20 @@ sm agents           # List all supported agents
 ### Install all skills from a repository
 
 ```bash
-# Discover and install all skills from a repository
-sm install https://github.com/cloudflare/skills --discover -a windsurf -a cursor
+# Install all skills from a repo (auto-discovery and symlinks enabled by default)
+sm install https://github.com/cloudflare/skills -a windsurf -a cursor
 
-# Use symlinks to save disk space (single source, multiple agents)
-sm install https://github.com/cloudflare/skills --discover --symlink -a windsurf
-```
+# Use symlinks to save disk space (enabled by default, use --no-symlink to disable)
+sm install https://github.com/cloudflare/skills -a claude-code
 
-### Install a single skill with CLI options
-
-```bash
 # Full CLI mode - no prompts
 sm install https://github.com/user/repo/tree/main/skills/my-skill -a claude-code -t global
+
+# Disable auto-discovery to install only the specific path
+sm install https://github.com/user/repo/tree/main/skills/my-skill --no-discover -a cursor
+
+# Disable symlinks, copy files instead
+sm install https://github.com/cloudflare/skills --no-symlink -a windsurf
 
 # Download to custom location
 sm install https://github.com/user/repo/tree/main/skills/my-skill -d ./my-skills -a cursor
@@ -250,8 +252,11 @@ sm restore
 Symlinks allow you to maintain a single copy of skills while deploying to multiple agents:
 
 ```bash
-# Download skills to a central location and symlink to agents
-sm install https://github.com/cloudflare/skills --discover -d ~/skills --symlink -a windsurf -a cursor -a claude-code
+# Download skills to a central location and symlink to agents (default behavior)
+sm install https://github.com/cloudflare/skills -d ~/skills -a windsurf -a cursor -a claude-code
+
+# Disable symlinks if needed
+sm install https://github.com/cloudflare/skills --no-symlink -a windsurf
 ```
 
 > [!NOTE]

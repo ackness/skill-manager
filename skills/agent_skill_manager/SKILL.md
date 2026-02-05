@@ -1,11 +1,11 @@
 ---
 name: skill-manager
-description: Manage AI agent skills - download from GitHub, deploy to multiple agents, update, uninstall with safe deletion, and track versions. Use when users want to install, manage, or update skills for AI coding assistants like Claude Code, Cursor, Windsurf, etc.
+description: Manage AI agent skills - download from GitHub, discover skills in repositories, deploy to multiple agents with symlink support, update, uninstall with safe deletion, and track versions. Use when users want to install, manage, or update skills for AI coding assistants like Claude Code, Cursor, Windsurf, etc.
 license: MIT
 compatibility: Requires Python 3.13+, uv or rye package manager, internet access for GitHub downloads
 metadata:
   author: ackness
-  version: "0.1.3"
+  version: "0.2.1"
   repository: https://github.com/ackness/skill-manager
   pypi: agent-skill-manager
   platforms:
@@ -17,24 +17,58 @@ allowed-tools: Bash(uv:*) Bash(git:*) Read Write
 
 # Skill Manager
 
-A comprehensive CLI tool for managing AI agent skills across multiple platforms. Supports downloading skills from GitHub, deploying to various AI agents, version tracking, safe deletion with recovery, and automatic updates.
+A comprehensive CLI tool for managing AI agent skills across multiple platforms. Supports downloading skills from GitHub, discovering all skills in a repository, deploying to various AI agents with symlink support, version tracking, safe deletion with recovery, and automatic updates.
+
+## Key Features
+
+- **Skill Discovery** - Automatically find all SKILL.md files in a GitHub repository
+- **Symlink Support** - Deploy skills using symlinks to save disk space
+- **CLI-first** - Full command-line parameter support for automation
+- **39 Agents** - Support for all major AI coding assistants
 
 ## Supported AI Agents
 
-- Claude Code
-- Cursor
-- Windsurf
-- OpenCode
-- Copilot
-- Goose
-- Gemini CLI
-- Roo Code
-- Kilo Code
-- Amp
-- Codex
-- Antigravity
-- Clawdbot
-- Droid
+| Agent | ID | Project Path | Global Path |
+|-------|-----|--------------|-------------|
+| Amp | `amp` | `.agents/skills/` | `~/.config/agents/skills/` |
+| Antigravity | `antigravity` | `.agent/skills/` | `~/.gemini/antigravity/skills/` |
+| Augment | `augment` | `.augment/rules/` | `~/.augment/rules/` |
+| Claude Code | `claude-code` | `.claude/skills/` | `~/.claude/skills/` |
+| Cline | `cline` | `.cline/skills/` | `~/.cline/skills/` |
+| CodeBuddy | `codebuddy` | `.codebuddy/skills/` | `~/.codebuddy/skills/` |
+| Codex | `codex` | `.agents/skills/` | `~/.codex/skills/` |
+| Command Code | `command-code` | `.commandcode/skills/` | `~/.commandcode/skills/` |
+| Continue | `continue` | `.continue/skills/` | `~/.continue/skills/` |
+| Crush | `crush` | `.crush/skills/` | `~/.config/crush/skills/` |
+| Cursor | `cursor` | `.cursor/skills/` | `~/.cursor/skills/` |
+| Droid | `droid` | `.factory/skills/` | `~/.factory/skills/` |
+| Gemini CLI | `gemini-cli` | `.agents/skills/` | `~/.gemini/skills/` |
+| GitHub Copilot | `github-copilot` | `.agents/skills/` | `~/.copilot/skills/` |
+| Goose | `goose` | `.goose/skills/` | `~/.config/goose/skills/` |
+| iFlow CLI | `iflow-cli` | `.iflow/skills/` | `~/.iflow/skills/` |
+| Junie | `junie` | `.junie/skills/` | `~/.junie/skills/` |
+| Kilo Code | `kilo` | `.kilocode/skills/` | `~/.kilocode/skills/` |
+| Kimi Code CLI | `kimi-cli` | `.agents/skills/` | `~/.config/agents/skills/` |
+| Kiro CLI | `kiro-cli` | `.kiro/skills/` | `~/.kiro/skills/` |
+| Kode | `kode` | `.kode/skills/` | `~/.kode/skills/` |
+| MCPJam | `mcpjam` | `.mcpjam/skills/` | `~/.mcpjam/skills/` |
+| Mistral Vibe | `mistral-vibe` | `.vibe/skills/` | `~/.vibe/skills/` |
+| Mux | `mux` | `.mux/skills/` | `~/.mux/skills/` |
+| Neovate | `neovate` | `.neovate/skills/` | `~/.neovate/skills/` |
+| OpenClaw | `openclaw` | `skills/` | `~/.moltbot/skills/` |
+| OpenCode | `opencode` | `.agents/skills/` | `~/.config/opencode/skills/` |
+| OpenHands | `openhands` | `.openhands/skills/` | `~/.openhands/skills/` |
+| Pi | `pi` | `.pi/skills/` | `~/.pi/agent/skills/` |
+| Pochi | `pochi` | `.pochi/skills/` | `~/.pochi/skills/` |
+| Qoder | `qoder` | `.qoder/skills/` | `~/.qoder/skills/` |
+| Qwen Code | `qwen-code` | `.qwen/skills/` | `~/.qwen/skills/` |
+| Replit | `replit` | `.agents/skills/` | N/A (project-only) |
+| Roo Code | `roo` | `.roo/skills/` | `~/.roo/skills/` |
+| Trae | `trae` | `.trae/skills/` | `~/.trae/skills/` |
+| Trae CN | `trae-cn` | `.trae/skills/` | `~/.trae-cn/skills/` |
+| Windsurf | `windsurf` | `.windsurf/skills/` | `~/.codeium/windsurf/skills/` |
+| Zencoder | `zencoder` | `.zencoder/skills/` | `~/.zencoder/skills/` |
+| AdaL | `adal` | `.adal/skills/` | `~/.adal/skills/` |
 
 ## Installation
 
@@ -90,93 +124,156 @@ After installation, the `sm` command will be available globally.
 
 ## Commands Overview
 
-### Download Skills
+| Command | Description |
+|---------|-------------|
+| `sm install [url]` | Download and deploy skills (with discovery) |
+| `sm download [url]` | Download a skill from GitHub |
+| `sm deploy` | Deploy local skills to agents |
+| `sm discover [url]` | Discover all skills in a repository |
+| `sm uninstall` | Remove skills (safe delete/hard delete) |
+| `sm restore` | Restore deleted skills from trash |
+| `sm update [--all]` | Update skills from GitHub |
+| `sm list` | Show installed skills with versions |
+| `sm agents` | List all supported agents |
+
+## CLI Options
+
+| Option | Description |
+|--------|-------------|
+| `-a, --agent AGENT` | Target agent(s), can be specified multiple times |
+| `-t, --type TYPE` | Deployment type: `global` (default) or `project` |
+| `-d, --dest PATH` | Custom destination directory for downloads |
+| `--no-symlink` | Disable symlinks, copy files instead (symlinks on by default) |
+| `--no-discover` | Disable auto-discovery, install only the specified path |
+| `--no-deploy` | Download only, skip deployment |
+| `-y`, `--yes` | Skip confirmation prompts |
+
+### Install Skills (CLI Mode - Recommended)
+
+由于支持 skill 的 agent 一般没有交互式环境，优先使用 CLI 格式：
+
 ```bash
-sm download
+# Install all skills from a repo (auto-discovery and symlinks enabled by default)
+sm install https://github.com/cloudflare/skills -a windsurf -a cursor
+
+# Full CLI mode - no prompts
+sm install https://github.com/user/repo/tree/main/skills/my-skill -a claude-code -t global
+
+# Disable auto-discovery, install only the specified path
+sm install https://github.com/user/repo/tree/main/skills/my-skill --no-discover -a cursor
+
+# Disable symlinks, copy files instead
+sm install https://github.com/cloudflare/skills --no-symlink -a windsurf
+
+# Download to custom location
+sm install https://github.com/user/repo/tree/main/skills/my-skill -d ./my-skills -a cursor
 ```
-Downloads a skill from GitHub to local storage. Saves metadata for version tracking and future updates.
 
-**When to use:** When you want to save a skill locally without deploying it yet.
+### Interactive Mode (For Interactive Terminals Only)
 
-**Interactive prompts:**
-- GitHub URL of the skill
-- Whether to save to local skills/ directory
-- Category for organization (optional)
-
-### Deploy Skills
-```bash
-sm deploy
-```
-Deploys skills from your local `skills/` directory to selected AI agents.
-
-**When to use:** When you have local skills ready to deploy to agents.
-
-**Interactive prompts:**
-- Deployment location (global/project)
-- Target agents
-- Skills to deploy
-
-### Install Skills
 ```bash
 sm install
+# Enter URL when prompted
+# Follow the prompts to save locally and deploy
 ```
-Combined operation: downloads from GitHub and deploys to agents in one step.
 
-**When to use:** When you want to quickly install a skill from GitHub to your agents.
-
-**Interactive prompts:**
-- GitHub URL
-- Whether to save locally
-- Category (if saving locally)
-- Whether to deploy
-- Target agents and deployment location
-
-### Update Skills
+### Discover Skills
 ```bash
-# Update selected skills
+# Scan a repository to find all skills
+sm discover https://github.com/cloudflare/skills
+# Shows a table of all found skills with their paths
+```
+
+### Download Skills (CLI Mode - Recommended)
+
+```bash
+# Download all skills from repo (auto-discovery enabled by default)
+sm download https://github.com/user/repo -d ~/my-skills
+
+# Download single skill to temp directory (default)
+sm download https://github.com/user/repo/tree/main/skills/my-skill
+
+# Disable auto-discovery, download only the specified path
+sm download https://github.com/user/repo/tree/main/skills/my-skill --no-discover -d ~/my-skills
+```
+
+### Interactive Mode (For Interactive Terminals Only)
+
+```bash
+sm download
+# Follow prompts to enter URL and destination
+```
+
+### Deploy Skills (CLI Mode - Recommended)
+
+For automated deployment without prompts:
+
+```bash
+# Deploy specific skills to specific agents
+sm deploy skill1 skill2 -a claude-code -a cursor -t global
+
+# Deploy with symlinks
+sm deploy my-skill -a windsurf --symlink
+```
+
+### Interactive Mode (For Interactive Terminals Only)
+
+```bash
+sm deploy
+# Select deployment type, agents, and skills interactively
+```
+
+### Update Skills (CLI Mode - Recommended)
+
+```bash
+# Update all skills without prompts
+sm update --all -y
+
+# Update specific skills
+sm update skill1 skill2 -a claude-code
+```
+
+### Interactive Mode (For Interactive Terminals Only)
+
+```bash
+# Update selected skills interactively
 sm update
 
-# Update all skills with GitHub metadata
+# Update all skills (with confirmation)
 sm update --all
 ```
-Updates skills from their GitHub sources. Only works for skills installed via `sm install` or with saved metadata.
 
-**When to use:** When you want to get the latest version of installed skills.
+### Uninstall Skills (CLI Mode - Recommended)
 
-**Features:**
-- Automatic backup before update
-- Rollback on failure
-- Updates metadata timestamps
-- Shows version information
+```bash
+# Uninstall specific skills from specific agents
+sm uninstall skill1 skill2 -a claude-code -a cursor
 
-### Uninstall Skills
+# Hard delete (permanent, no trash)
+sm uninstall my-skill -a windsurf --hard
+```
+
+### Interactive Mode (For Interactive Terminals Only)
+
 ```bash
 sm uninstall
+# Select skills to remove interactively
+# Choose "Safe delete" (default) or "Hard delete"
 ```
-Removes skills from agents with two deletion modes:
-- **Safe delete (default):** Moves to `.trash` with timestamp for recovery
-- **Hard delete:** Permanent removal
 
-**When to use:** When you want to remove skills from agents.
+### Restore Skills (CLI Mode - Recommended)
 
-**Interactive prompts:**
-- Deployment type
-- Target agents
-- Skills to remove
-- Deletion type (safe/hard)
+```bash
+# Restore specific skills
+sm restore skill1 skill2 -a claude-code
+```
 
-### Restore Skills
+### Interactive Mode (For Interactive Terminals Only)
+
 ```bash
 sm restore
+# Select skills to restore interactively (shows deletion timestamp)
 ```
-Restores previously deleted skills from trash.
-
-**When to use:** When you accidentally deleted a skill or want to recover it.
-
-**Interactive prompts:**
-- Deployment type
-- Target agents
-- Skills to restore (shows deletion timestamp)
 
 ### List Skills
 ```bash
@@ -184,14 +281,11 @@ sm list
 ```
 Shows all installed skills with version information across agents.
 
-**When to use:** When you want to see what skills are installed and their versions.
-
-**Displays:**
-- Skill names
-- Version/update timestamp
-- Source (GitHub/Local)
-- GitHub URL (for updatable skills)
-- Organized by agent
+### List Agents
+```bash
+sm agents
+```
+Shows all 39 supported agents with their project and global paths.
 
 ## Directory Structure
 
@@ -249,32 +343,45 @@ The tool uses two methods for version identification:
    - Fallback for skills without metadata
    - Format: YYYY-MM-DD HH:MM:SS
 
-## Examples
+## Examples (CLI-First)
 
-### Install a skill from GitHub
+所有示例优先展示 CLI 格式，适用于自动化和无交互环境：
 
-With uvx (no installation needed):
+### Install all skills from a repository (auto-discovery)
 ```bash
-uvx --from agent-skill-manager sm install
-# Enter URL: https://github.com/user/repo/tree/main/skills/example-skill
-# Save locally? Yes
-# Category: productivity
-# Deploy? Yes
-# Select agents: Claude Code, Cursor
-# Deployment: Global
+# Auto-discovery is enabled by default - installs all skills found in repo
+sm install https://github.com/cloudflare/skills -a windsurf -a cursor -a claude-code
+
+# Use symlinks to save disk space (single copy, multiple deployments)
+sm install https://github.com/cloudflare/skills --symlink -a windsurf
 ```
 
-Or with installed version:
+### Install a single skill (CLI mode)
+```bash
+# Full CLI mode - no prompts
+sm install https://github.com/user/repo/tree/main/skills/my-skill -a claude-code -t global
+
+# Download to custom location
+sm install https://github.com/user/repo/tree/main/skills/my-skill -d ./my-skills -a cursor
+```
+
+### Interactive mode (alternative for interactive terminals)
 ```bash
 sm install
-# Follow the same prompts as above
+# Enter URL when prompted
+# Follow the prompts to save locally and deploy
+```
+
+### Discover skills in a repo
+```bash
+sm discover https://github.com/cloudflare/skills
+# Shows a table of all found skills with their paths and URLs
 ```
 
 ### Update all skills
 ```bash
 sm update --all
-# Selects all agents with GitHub-sourced skills
-# Downloads latest versions
+# Downloads latest versions from GitHub
 # Updates metadata timestamps
 ```
 
@@ -294,13 +401,24 @@ sm uninstall
 # Can be restored later with sm restore
 ```
 
+### Using symlinks
+```bash
+# Download skills to a central location and symlink to agents (default behavior)
+sm install https://github.com/cloudflare/skills -d ~/skills -a windsurf -a cursor -a claude-code
+
+# Disable symlinks if needed
+sm install https://github.com/cloudflare/skills --no-symlink -a windsurf
+```
+Note: On Windows, symlinks require Developer Mode or admin privileges. Falls back to copying if not supported or when `--no-symlink` is used.
+
 ## Best Practices
 
-1. **Use safe delete by default** - You can always restore if needed
-2. **Update regularly** - Run `sm update --all` periodically for bug fixes and improvements
-3. **Save skills locally** - Keep a local copy in `skills/` for backup
-4. **Organize with categories** - Use categories when saving locally for better organization
-5. **Check versions** - Use `sm list` to see what's installed and outdated
+1. **Symlinks are enabled by default** - Save disk space automatically, use `--no-symlink` to disable
+2. **Auto-discovery is enabled by default** - Discover and install all skills automatically, use `--no-discover` to disable
+3. **Use safe delete by default** - You can always restore if needed
+4. **Update regularly** - Run `sm update --all` periodically for bug fixes and improvements
+5. **Use CLI options for automation** - Avoid prompts with `-a`, `-t`, `-y` flags
+6. **Check versions** - Use `sm list` to see what's installed and outdated
 
 ## Troubleshooting
 

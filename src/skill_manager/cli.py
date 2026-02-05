@@ -88,8 +88,10 @@ def create_parser() -> argparse.ArgumentParser:
         "-t", "--type", choices=["global", "project"], default="global", help="Deployment type (default: global)"
     )
     install_parser.add_argument("-d", "--dest", type=Path, help="Destination directory for downloaded skills")
-    install_parser.add_argument("--symlink", action="store_true", help="Use symlinks instead of copying")
-    install_parser.add_argument("--discover", action="store_true", help="Discover and install all skills in a repository")
+    install_parser.add_argument("--no-symlink", action="store_true", help="Disable symlinks, copy files instead")
+    install_parser.add_argument(
+        "--no-discover", action="store_true", help="Disable auto-discovery, install only the specified path"
+    )
     install_parser.add_argument("--no-deploy", action="store_true", help="Download only, do not deploy")
     install_parser.add_argument("-y", "--yes", action="store_true", help="Skip confirmation prompts")
 
@@ -97,7 +99,9 @@ def create_parser() -> argparse.ArgumentParser:
     download_parser = subparsers.add_parser("download", help="Download skills from GitHub")
     download_parser.add_argument("url", nargs="?", help="GitHub URL of the skill or repository")
     download_parser.add_argument("-d", "--dest", type=Path, help="Destination directory")
-    download_parser.add_argument("--discover", action="store_true", help="Discover all skills in a repository")
+    download_parser.add_argument(
+        "--no-discover", action="store_true", help="Disable auto-discovery, download only the specified path"
+    )
     download_parser.add_argument("-y", "--yes", action="store_true", help="Skip confirmation prompts")
 
     # Deploy command
@@ -105,7 +109,7 @@ def create_parser() -> argparse.ArgumentParser:
     deploy_parser.add_argument("skills", nargs="*", help="Skill names or paths to deploy")
     deploy_parser.add_argument("-a", "--agent", action="append", dest="agents", help="Target agent(s)")
     deploy_parser.add_argument("-t", "--type", choices=["global", "project"], default="global", help="Deployment type")
-    deploy_parser.add_argument("--symlink", action="store_true", help="Use symlinks instead of copying")
+    deploy_parser.add_argument("--no-symlink", action="store_true", help="Disable symlinks, copy files instead")
     deploy_parser.add_argument("-y", "--yes", action="store_true", help="Skip confirmation prompts")
 
     # Discover command
@@ -1334,7 +1338,7 @@ def cmd_install_cli(args: argparse.Namespace) -> int:
 
     url = args.url
     deployment_type = args.type
-    use_symlink = args.symlink
+    use_symlink = not args.no_symlink
     skip_deploy = args.no_deploy
     # auto_confirm = args.yes  # Reserved for future use
 
@@ -1363,7 +1367,7 @@ def cmd_install_cli(args: argparse.Namespace) -> int:
         use_symlink = False
 
     # Discover skills if requested
-    if args.discover:
+    if not args.no_discover:
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -1537,7 +1541,7 @@ def cmd_download_cli(args: argparse.Namespace) -> int:
     console.print(f"[dim]Download location: {dest_dir}[/dim]\n")
 
     # Discover skills if requested
-    if args.discover:
+    if not args.no_discover:
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -1637,10 +1641,10 @@ def main() -> int:
                 "[bold]CLI Options:[/bold]\n"
                 "  -a, --agent AGENT  - Target agent(s)\n"
                 "  -t, --type TYPE    - Deployment type (global/project)\n"
-                "  --symlink          - Use symlinks instead of copying\n"
-                "  --discover         - Discover all skills in repository\n"
+                "  --no-symlink       - Disable symlinks, copy files instead\n"
+                "  --no-discover      - Disable auto-discovery\n"
                 "  -y, --yes          - Skip confirmation prompts\n\n"
-                "[dim]Example: sm install https://github.com/cloudflare/skills --discover -a windsurf --symlink[/dim]",
+                "[dim]Example: sm install https://github.com/cloudflare/skills -a windsurf -a cursor[/dim]",
                 border_style="cyan",
             )
         )

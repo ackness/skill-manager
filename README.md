@@ -11,10 +11,10 @@ A comprehensive CLI tool for managing AI agent skills across multiple platforms.
 ## Features
 
 - 📥 **Download** skills from GitHub with metadata tracking
-- � **Discover** all skills in a repository automatically
-- � **Deploy** skills to multiple AI agents (global or project-level)
-- � **Symlink** support - save disk space with symbolic links
-- � **Update** skills automatically from GitHub sources
+- 🔍 **Discover** all skills in a repository automatically
+- 🚀 **Deploy** skills to multiple AI agents (global or project-level)
+- 🔗 **Symlink** support - save disk space with symbolic links
+- 🔄 **Update** skills automatically from GitHub sources
 - 🗑️ **Uninstall** with safe deletion (move to trash) or hard delete
 - ♻️ **Restore** deleted skills from trash
 - 📋 **List** all installed skills with version information

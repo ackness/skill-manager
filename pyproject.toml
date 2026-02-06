@@ -1,6 +1,6 @@
 [project]
 name = "agent-skill-manager"
-version = "0.2.1"
+version = "0.2.3"
 description = "CLI tool for managing AI agent skills across multiple platforms"
 authors = [
     { name = "ackness", email = "ackness8@gmail.com" }

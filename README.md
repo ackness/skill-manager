@@ -173,22 +173,57 @@ sm agents           # List all supported agents
 |--------|-------------|
 | `-a, --agent AGENT` | Target agent(s), can be specified multiple times |
 | `-t, --type TYPE` | Deployment type: `global` (default) or `project` |
-| `-d, --dest PATH` | Custom destination directory for downloads |
+| `-d, --dest PATH` | Custom destination directory (default: `~/.skill-manager/skills/`) |
+| `-s, --skills NAME` | Skill name(s) to install (default: all discovered skills) |
 | `--no-symlink` | Disable symlinks, copy files instead (symlinks on by default) |
 | `--no-discover` | Disable auto-discovery (on by default) |
 | `--no-deploy` | Download only, skip deployment |
 | `-y, --yes` | Skip confirmation prompts |
 
+## Network Configuration
+
+The tool supports proxy, GitHub token, and GitHub mirror via environment variables:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `GITHUB_TOKEN` / `GH_TOKEN` | GitHub personal access token (increases API rate limit) | `ghp_xxxx` |
+| `HTTP_PROXY` / `HTTPS_PROXY` | HTTP/HTTPS proxy URL | `http://127.0.0.1:7890` |
+| `ALL_PROXY` | Fallback proxy for both HTTP and HTTPS | `socks5://127.0.0.1:1080` |
+| `GITHUB_MIRROR` | GitHub download mirror prefix | `https://mirror.ghproxy.com` |
+
+```bash
+# Example: use proxy for faster downloads
+export HTTPS_PROXY=http://127.0.0.1:7890
+sm install https://github.com/cloudflare/skills -a windsurf
+
+# Example: use GitHub token to avoid rate limits
+export GITHUB_TOKEN=ghp_your_token_here
+sm install https://github.com/cloudflare/skills -a windsurf
+
+# Example: use GitHub mirror (for users in China)
+export GITHUB_MIRROR=https://mirror.ghproxy.com
+sm install https://github.com/cloudflare/skills -a windsurf
+
+# PowerShell (Windows)
+$env:HTTPS_PROXY="http://127.0.0.1:7890"
+$env:GITHUB_TOKEN="ghp_your_token_here"
+sm install https://github.com/cloudflare/skills -a windsurf
+```
+
+> [!TIP]
+> Get a GitHub token at https://github.com/settings/tokens (only `public_repo` scope needed).
+> Network status is shown during GitHub operations.
+
 ## Usage Examples
 
-### Install all skills from a repository
+### Install skills from a GitHub repository
 
 ```bash
 # Install all skills from a repo (auto-discovery and symlinks enabled by default)
 sm install https://github.com/cloudflare/skills -a windsurf -a cursor
 
-# Use symlinks to save disk space (enabled by default, use --no-symlink to disable)
-sm install https://github.com/cloudflare/skills -a claude-code
+# Install specific skills only
+sm install https://github.com/cloudflare/skills -s mcp -s browser-rendering -a windsurf
 
 # Full CLI mode - no prompts
 sm install https://github.com/user/repo/tree/main/skills/my-skill -a claude-code -t global
@@ -203,6 +238,19 @@ sm install https://github.com/cloudflare/skills --no-symlink -a windsurf
 sm install https://github.com/user/repo/tree/main/skills/my-skill -d ./my-skills -a cursor
 ```
 
+### Install skills from a local directory
+
+```bash
+# Install from a previously downloaded skills directory
+sm install ~/.skill-manager/skills -a windsurf -a cursor
+
+# Install specific skills from local directory
+sm install ~/my-skills -s my-skill-name -a claude-code
+
+# Install from any local directory containing SKILL.md files
+sm install ./path/to/skills -a windsurf
+```
+
 ### Discover skills in a repository
 
 ```bash
@@ -211,12 +259,12 @@ sm discover https://github.com/cloudflare/skills
 # Shows a table of all found skills with their paths
 ```
 
-### Interactive mode (legacy)
+### Interactive mode
 
 ```bash
 sm install
-# Enter URL when prompted
-# Follow the prompts to save locally and deploy
+# Enter URL when prompted, all skills are pre-selected by default
+# Follow the prompts to select agents and deploy
 ```
 
 ### Update all skills
@@ -276,6 +324,9 @@ The tool uses two methods for version identification:
    - For skills without metadata
 
 ## Directory Structure
+
+### Default Skills Cache
+Downloaded skills are stored in `~/.skill-manager/skills/` by default (cross-platform).
 
 ### Global Installation
 Skills are available to all projects:

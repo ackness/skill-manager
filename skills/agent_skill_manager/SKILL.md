@@ -5,7 +5,7 @@ license: MIT
 compatibility: Requires Python 3.13+, uv or rye package manager, internet access for GitHub downloads
 metadata:
   author: ackness
-  version: "0.2.1"
+  version: "0.2.3"
   repository: https://github.com/ackness/skill-manager
   pypi: agent-skill-manager
   platforms:
@@ -142,11 +142,45 @@ After installation, the `sm` command will be available globally.
 |--------|-------------|
 | `-a, --agent AGENT` | Target agent(s), can be specified multiple times |
 | `-t, --type TYPE` | Deployment type: `global` (default) or `project` |
-| `-d, --dest PATH` | Custom destination directory for downloads |
+| `-d, --dest PATH` | Custom destination directory (default: `~/.skill-manager/skills/`) |
+| `-s, --skills NAME` | Skill name(s) to install (default: all discovered skills) |
 | `--no-symlink` | Disable symlinks, copy files instead (symlinks on by default) |
 | `--no-discover` | Disable auto-discovery, install only the specified path |
 | `--no-deploy` | Download only, skip deployment |
 | `-y`, `--yes` | Skip confirmation prompts |
+
+## Network Configuration
+
+Supports proxy, GitHub token, and GitHub mirror via environment variables:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `GITHUB_TOKEN` / `GH_TOKEN` | GitHub personal access token (increases API rate limit) | `ghp_xxxx` |
+| `HTTP_PROXY` / `HTTPS_PROXY` | HTTP/HTTPS proxy URL | `http://127.0.0.1:7890` |
+| `ALL_PROXY` | Fallback proxy for both HTTP and HTTPS | `socks5://127.0.0.1:1080` |
+| `GITHUB_MIRROR` | GitHub download mirror prefix | `https://mirror.ghproxy.com` |
+
+```bash
+# Use proxy for faster downloads
+export HTTPS_PROXY=http://127.0.0.1:7890
+sm install https://github.com/cloudflare/skills -a windsurf
+
+# Use GitHub token to avoid rate limits
+export GITHUB_TOKEN=ghp_your_token_here
+sm install https://github.com/cloudflare/skills -a windsurf
+
+# Use GitHub mirror (for users in China)
+export GITHUB_MIRROR=https://mirror.ghproxy.com
+sm install https://github.com/cloudflare/skills -a windsurf
+
+# PowerShell (Windows)
+$env:HTTPS_PROXY="http://127.0.0.1:7890"
+$env:GITHUB_TOKEN="ghp_your_token_here"
+sm install https://github.com/cloudflare/skills -a windsurf
+```
+
+Get a GitHub token at https://github.com/settings/tokens (only `public_repo` scope needed).
+Network status (proxy/token/mirror) is shown during GitHub operations.
 
 ### Install Skills (CLI Mode - Recommended)
 
@@ -155,6 +189,9 @@ After installation, the `sm` command will be available globally.
 ```bash
 # Install all skills from a repo (auto-discovery and symlinks enabled by default)
 sm install https://github.com/cloudflare/skills -a windsurf -a cursor
+
+# Install specific skills only
+sm install https://github.com/cloudflare/skills -s mcp -s browser-rendering -a windsurf
 
 # Full CLI mode - no prompts
 sm install https://github.com/user/repo/tree/main/skills/my-skill -a claude-code -t global
@@ -169,12 +206,25 @@ sm install https://github.com/cloudflare/skills --no-symlink -a windsurf
 sm install https://github.com/user/repo/tree/main/skills/my-skill -d ./my-skills -a cursor
 ```
 
+### Install Skills from Local Directory
+
+```bash
+# Install from previously downloaded skills directory
+sm install ~/.skill-manager/skills -a windsurf -a cursor
+
+# Install specific skills from local directory
+sm install ~/my-skills -s my-skill-name -a claude-code
+
+# Install from any local directory containing SKILL.md files
+sm install ./path/to/skills -a windsurf
+```
+
 ### Interactive Mode (For Interactive Terminals Only)
 
 ```bash
 sm install
-# Enter URL when prompted
-# Follow the prompts to save locally and deploy
+# Enter URL when prompted, all skills are pre-selected by default
+# Follow the prompts to select agents and deploy
 ```
 
 ### Discover Skills
@@ -419,6 +469,9 @@ Note: On Windows, symlinks require Developer Mode or admin privileges. Falls bac
 4. **Update regularly** - Run `sm update --all` periodically for bug fixes and improvements
 5. **Use CLI options for automation** - Avoid prompts with `-a`, `-t`, `-y` flags
 6. **Check versions** - Use `sm list` to see what's installed and outdated
+7. **Set GITHUB_TOKEN** - Avoid API rate limits, especially for large repositories
+8. **Use proxy/mirror** - Speed up downloads with `HTTPS_PROXY` or `GITHUB_MIRROR`
+9. **Install from local** - Use `sm install <local_path>` to deploy previously downloaded skills without re-downloading
 
 ## Troubleshooting
 
@@ -433,6 +486,9 @@ uv pip install -e .
 - Verify the GitHub URL is correct
 - Ensure the URL points to a directory, not a file
 - Check if the repository is public
+- Set `GITHUB_TOKEN` to avoid rate limits: `export GITHUB_TOKEN=ghp_xxx`
+- Use proxy for faster downloads: `export HTTPS_PROXY=http://127.0.0.1:7890`
+- Use mirror for users in China: `export GITHUB_MIRROR=https://mirror.ghproxy.com`
 
 ### Skill not showing in agent
 - Verify the agent is running

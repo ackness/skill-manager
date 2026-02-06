@@ -39,10 +39,12 @@ from .deployment import (
     update_skill,
 )
 from .github import (
+    discover_local_skills,
     discover_skills_in_repo,
     download_multiple_skills,
     download_skill_from_github,
-    get_system_temp_dir,
+    get_default_skills_dir,
+    get_network_info,
     parse_github_url,
 )
 from .metadata import (
@@ -59,7 +61,6 @@ from .removal import (
 )
 from .validation import (
     get_project_root,
-    get_skill_name,
     scan_available_skills,
     validate_skill,
 )
@@ -79,8 +80,8 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # Install command
-    install_parser = subparsers.add_parser("install", help="Download and deploy skills from GitHub")
-    install_parser.add_argument("url", nargs="?", help="GitHub URL of the skill or repository")
+    install_parser = subparsers.add_parser("install", help="Download and deploy skills from GitHub or local directory")
+    install_parser.add_argument("url", nargs="?", help="GitHub URL, or local path to skill directory")
     install_parser.add_argument(
         "-a", "--agent", action="append", dest="agents", help="Target agent(s) (can be specified multiple times)"
     )
@@ -88,6 +89,9 @@ def create_parser() -> argparse.ArgumentParser:
         "-t", "--type", choices=["global", "project"], default="global", help="Deployment type (default: global)"
     )
     install_parser.add_argument("-d", "--dest", type=Path, help="Destination directory for downloaded skills")
+    install_parser.add_argument(
+        "-s", "--skills", action="append", dest="skill_names", help="Skill name(s) to install (default: all)"
+    )
     install_parser.add_argument("--no-symlink", action="store_true", help="Disable symlinks, copy files instead")
     install_parser.add_argument(
         "--no-discover", action="store_true", help="Disable auto-discovery, install only the specified path"
@@ -179,11 +183,15 @@ def select_agents(existing_agents: dict[str, Path]) -> list[str]:
         choices.append(Separator("--- Other Available Agents ---"))
         for agent_id in sorted(other_agents):
             info = AGENTS[agent_id]
-            global_path = Path(info["global"]).expanduser()
+            if info.get("global"):
+                global_path = Path(info["global"]).expanduser()
+                display_path = str(global_path)
+            else:
+                display_path = "(project-only)"
             choices.append(
                 Choice(
                     value=agent_id,
-                    name=f"{info['name']} ({global_path})",
+                    name=f"{info['name']} ({display_path})",
                     enabled=False,
                 )
             )
@@ -497,6 +505,7 @@ def cmd_deploy() -> int:
 def cmd_install() -> int:
     """
     Install command - Download and deploy skills in one step.
+    Auto-discovers skills in the repository by default.
 
     Returns:
         Exit code (0 for success, non-zero for failure)
@@ -527,6 +536,68 @@ def cmd_install() -> int:
         console.print(f"[red]Error: {e}[/red]")
         return 1
 
+    # Discover skills first
+    try:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Discovering skills...", total=None)
+            skills_info = discover_skills_in_repo(url)
+            progress.update(task, completed=True)
+    except Exception as e:
+        error_msg = str(e)
+        if "rate limit" in error_msg.lower():
+            console.print("[red]GitHub API rate limit exceeded.[/red]")
+            console.print("[dim]Set GITHUB_TOKEN or GH_TOKEN environment variable to increase limits.[/dim]")
+        else:
+            console.print(f"[red]Error discovering skills: {e}[/red]")
+        return 1
+
+    selected_skills_info = []
+
+    if skills_info:
+        console.print(f"[green]✓[/green] Found {len(skills_info)} skill(s) in repository\n")
+
+        # Build choices for selection
+        choices = []
+        for skill in skills_info:
+            choices.append(
+                Choice(
+                    value=skill,
+                    name=f"{skill['name']} ({skill['path']})",
+                    enabled=True,
+                )
+            )
+
+        # Ask user to select skills
+        selected_skills_info = inquirer.checkbox(
+            message="Select skills to install:",
+            choices=choices,
+            instruction="(Space to select, Enter to confirm)",
+        ).execute()
+
+        if not selected_skills_info:
+            console.print("[yellow]No skills selected. Exiting.[/yellow]")
+            return 0
+    else:
+        # No skills found, ask if user wants to download the specified path anyway
+        console.print("[yellow]No skills (SKILL.md) found in repository.[/yellow]")
+        download_anyway = inquirer.confirm(
+            message="Download the specified path anyway?",
+            default=False,
+        ).execute()
+
+        if not download_anyway:
+            console.print("[yellow]Installation cancelled.[/yellow]")
+            return 0
+
+        # Use the URL as a single skill
+        selected_skills_info = [{"url": url, "path": path or "", "name": path.split("/")[-1] if path else repo}]
+
+    console.print()
+
     # Ask whether to save locally
     save_to_local = inquirer.confirm(
         message="Save to local skills/ directory?",
@@ -553,32 +624,57 @@ def cmd_install() -> int:
     else:
         dest_dir = Path.cwd() / ".tmp_skills"
 
-    # Download skill
+    # Download skills
+    downloaded = []
     try:
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-        ) as progress:
-            task = progress.add_task("Downloading skill...", total=None)
-            skill_dir, metadata = download_skill_from_github(url, dest_dir)
-            progress.update(task, completed=True)
+        if len(selected_skills_info) == 1 and not skills_info:
+            # Single skill download (when no discovery)
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+            ) as progress:
+                task = progress.add_task("Downloading skill...", total=None)
+                skill_dir, metadata = download_skill_from_github(url, dest_dir)
+                progress.update(task, completed=True)
 
-        # Save metadata
-        save_skill_metadata(
-            skill_dir,
-            url,
-            metadata["owner"],
-            metadata["repo"],
-            metadata["branch"],
-            metadata["path"],
-        )
+            save_skill_metadata(
+                skill_dir,
+                url,
+                metadata["owner"],
+                metadata["repo"],
+                metadata["branch"],
+                metadata["path"],
+            )
 
-        # Validate
-        if not validate_skill(skill_dir):
-            console.print(f"[yellow]Warning: {skill_dir} does not contain SKILL.md, may not be a valid skill[/yellow]")
+            if not validate_skill(skill_dir):
+                console.print(f"[yellow]Warning: {skill_dir} does not contain SKILL.md, may not be a valid skill[/yellow]")
 
-        console.print(f"[green]✓[/green] Skill downloaded to: {skill_dir}\n")
+            console.print(f"[green]✓[/green] Skill downloaded to: {skill_dir}\n")
+            downloaded = [(skill_dir, metadata)]
+        else:
+            # Multiple skills download
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+            ) as progress:
+                task = progress.add_task("Downloading skills...", total=None)
+                downloaded = download_multiple_skills(selected_skills_info, dest_dir)
+                progress.update(task, completed=True)
+
+            console.print(f"[green]✓[/green] Downloaded {len(downloaded)} skills\n")
+
+            # Save metadata for each
+            for skill_dir, metadata in downloaded:
+                save_skill_metadata(
+                    skill_dir,
+                    metadata["url"],
+                    metadata["owner"],
+                    metadata["repo"],
+                    metadata["branch"],
+                    metadata["path"],
+                )
 
     except Exception as e:
         console.print(f"[red]Download failed: {e}[/red]")
@@ -613,37 +709,49 @@ def cmd_install() -> int:
 
     console.print()
 
-    # Deploy
-    success_count, fail_count = deploy_skill_to_agents(
-        skill_dir, selected_agents, deployment_type, get_project_root() if deployment_type == "project" else None
-    )
+    # Deploy all downloaded skills and collect deployment info
+    project_root = get_project_root() if deployment_type == "project" else None
+    deployment_details = []  # List of (skill_name, agent_id, target_path)
+
+    for skill_dir, _ in downloaded:
+        skill_name = skill_dir.name
+        for agent_id in selected_agents:
+            target_path = get_agent_path(agent_id, deployment_type, project_root) / skill_name
+            deployment_details.append((skill_name, agent_id, target_path))
+
+        deploy_skill_to_agents(skill_dir, selected_agents, deployment_type, project_root)
 
     # Clean up temporary files
-    if not save_to_local and skill_dir.parent.name == ".tmp_skills":
-        shutil.rmtree(skill_dir.parent, ignore_errors=True)
+    if not save_to_local:
+        tmp_dir = Path.cwd() / ".tmp_skills"
+        if tmp_dir.exists():
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
     console.print()
 
-    # Show results
-    if fail_count == 0:
-        console.print(
-            Panel.fit(
-                f"[bold green]✓ Installation successful![/bold green]\n\n"
-                f"Skill: {get_skill_name(skill_dir)}\n"
-                f"Deployed to {success_count} agents",
-                border_style="green",
-            )
-        )
-    else:
-        console.print(
-            Panel.fit(
-                f"[bold yellow]⚠ Installation completed with errors[/bold yellow]\n\n"
-                f"Success: {success_count} | Failed: {fail_count}",
-                border_style="yellow",
-            )
-        )
+    # Show detailed results
+    table = Table(title="Installation Summary", show_header=True, header_style="bold cyan")
+    table.add_column("Skill", style="green", no_wrap=True)
+    table.add_column("Agent", style="yellow")
+    table.add_column("Target Path", style="dim", overflow="fold")
 
-    return 0 if fail_count == 0 else 1
+    for skill_name, agent_id, target_path in deployment_details:
+        table.add_row(skill_name, get_agent_name(agent_id), str(target_path))
+
+    console.print(table)
+    console.print()
+
+    console.print(
+        Panel.fit(
+            f"[bold green]✓ Installation successful![/bold green]\n\n"
+            f"Skills installed: {len(downloaded)}\n"
+            f"Agents: {len(selected_agents)}\n"
+            f"Source: {dest_dir}",
+            border_style="green",
+        )
+    )
+
+    return 0
 
 
 def cmd_uninstall() -> int:
@@ -1272,7 +1380,8 @@ def cmd_discover(args: argparse.Namespace) -> int:
         console.print(table)
         console.print()
 
-        console.print("[dim]Use 'sm install <url> --discover' to install all found skills[/dim]")
+        console.print("[dim]Use 'sm install <url>' to install discovered skills (auto-discovery enabled by default)[/dim]")
+        console.print("[dim]Use 'sm install <url> --no-discover' to install only the specified path[/dim]")
         return 0
 
     except Exception as e:
@@ -1315,9 +1424,36 @@ def cmd_agents() -> int:
     return 0
 
 
+def _show_network_info() -> None:
+    """Display current network configuration (proxy, mirror, token)."""
+    info = get_network_info()
+    parts = []
+    if info["token"]:
+        parts.append(f"Token: {info['token']}")
+    if info["proxy"]:
+        parts.append(f"Proxy: {info['proxy']}")
+    if info["mirror"]:
+        parts.append(f"Mirror: {info['mirror']}")
+    if parts:
+        console.print(f"[dim]Network: {' | '.join(parts)}[/dim]")
+    else:
+        console.print("[dim]Network: direct (no proxy/token/mirror)[/dim]")
+
+
+def _is_local_path(source: str) -> bool:
+    """Check if source is a local directory path rather than a URL."""
+    # Check for common URL schemes
+    if source.startswith(("http://", "https://", "github.com")):
+        return False
+    # Check if it looks like a local path
+    p = Path(source)
+    return p.exists() and p.is_dir()
+
+
 def cmd_install_cli(args: argparse.Namespace) -> int:
     """
     Install command with CLI arguments - Download and deploy skills.
+    Supports GitHub URLs and local directory paths.
 
     Args:
         args: Parsed command line arguments
@@ -1329,112 +1465,178 @@ def cmd_install_cli(args: argparse.Namespace) -> int:
     if not args.url:
         return cmd_install()
 
-    console.print(
-        Panel.fit(
-            "[bold cyan]Install Skill[/bold cyan]\nDownload and deploy a skill from GitHub",
-            border_style="cyan",
-        )
-    )
-
-    url = args.url
+    source = args.url
     deployment_type = args.type
     use_symlink = not args.no_symlink
     skip_deploy = args.no_deploy
-    # auto_confirm = args.yes  # Reserved for future use
+    skill_filter = args.skill_names  # List of skill names to install, None means all
+    is_local = _is_local_path(source)
 
-    # Parse URL to show info
-    try:
-        owner, repo, branch, path = parse_github_url(url)
-        console.print(f"[dim]Repository: {owner}/{repo}[/dim]")
-        console.print(f"[dim]Branch: {branch}[/dim]")
-        console.print(f"[dim]Path: {path or '(root)'}[/dim]\n")
-    except ValueError as e:
-        console.print(f"[red]Error: {e}[/red]")
-        return 1
+    if is_local:
+        # --- Local directory installation ---
+        local_path = Path(source).resolve()
+        console.print(
+            Panel.fit(
+                "[bold cyan]Install Skill[/bold cyan]\nDeploy skills from local directory",
+                border_style="cyan",
+            )
+        )
+        console.print(f"[dim]Source: {local_path}[/dim]\n")
 
-    # Determine destination directory
-    if args.dest:
-        dest_dir = args.dest
-    else:
-        dest_dir = get_system_temp_dir()
-
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    console.print(f"[dim]Download location: {dest_dir}[/dim]\n")
-
-    # Check symlink support
-    if use_symlink and not is_symlink_supported():
-        console.print("[yellow]Warning: Symlinks not supported on this system, will copy instead[/yellow]")
-        use_symlink = False
-
-    # Discover skills if requested
-    if not args.no_discover:
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-        ) as progress:
-            task = progress.add_task("Discovering skills...", total=None)
-            skills_info = discover_skills_in_repo(url)
-            progress.update(task, completed=True)
-
+        # Discover local skills
+        skills_info = discover_local_skills(local_path)
         if not skills_info:
-            console.print("[yellow]No skills found in the repository.[/yellow]")
+            console.print("[yellow]No skills found (no SKILL.md) in the directory.[/yellow]")
             return 0
 
-        console.print(f"[green]✓[/green] Found {len(skills_info)} skills\n")
+        # Filter skills if --skills is specified
+        if skill_filter:
+            filtered = [s for s in skills_info if s["name"] in skill_filter]
+            if not filtered:
+                console.print(f"[red]No matching skills found for: {', '.join(skill_filter)}[/red]")
+                console.print(f"[dim]Available skills: {', '.join(s['name'] for s in skills_info)}[/dim]")
+                return 1
+            skills_info = filtered
+            console.print(f"[green]✓[/green] Installing {len(skills_info)} selected skill(s)\n")
+        else:
+            console.print(f"[green]✓[/green] Found {len(skills_info)} local skill(s) (installing all)\n")
 
-        # Download all skills
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-        ) as progress:
-            task = progress.add_task("Downloading skills...", total=None)
-            downloaded = download_multiple_skills(skills_info, dest_dir)
-            progress.update(task, completed=True)
+        for skill in skills_info:
+            console.print(f"  • {skill['name']} ({skill['path']})")
+        console.print()
 
-        console.print(f"[green]✓[/green] Downloaded {len(downloaded)} skills\n")
+        # Local skills don't need downloading - use paths directly
+        downloaded = [(Path(s["path"]), {}) for s in skills_info]
 
-        # Save metadata for each
-        for skill_dir, metadata in downloaded:
-            save_skill_metadata(
-                skill_dir,
-                metadata["url"],
-                metadata["owner"],
-                metadata["repo"],
-                metadata["branch"],
-                metadata["path"],
-            )
     else:
-        # Download single skill
+        # --- GitHub URL installation ---
+        console.print(
+            Panel.fit(
+                "[bold cyan]Install Skill[/bold cyan]\nDownload and deploy a skill from GitHub",
+                border_style="cyan",
+            )
+        )
+
+        # Parse URL to show info
         try:
+            owner, repo, branch, path = parse_github_url(source)
+            console.print(f"[dim]Repository: {owner}/{repo}[/dim]")
+            console.print(f"[dim]Branch: {branch}[/dim]")
+            console.print(f"[dim]Path: {path or '(root)'}[/dim]")
+        except ValueError as e:
+            console.print(f"[red]Error: {e}[/red]")
+            return 1
+
+        _show_network_info()
+        console.print()
+
+        # Determine destination directory
+        if args.dest:
+            dest_dir = args.dest
+        else:
+            dest_dir = get_default_skills_dir()
+
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        console.print(f"[dim]Download location: {dest_dir}[/dim]\n")
+
+        # Check symlink support
+        if use_symlink and not is_symlink_supported():
+            console.print("[yellow]Warning: Symlinks not supported on this system, will copy instead[/yellow]")
+            use_symlink = False
+
+        # Discover skills if requested
+        if not args.no_discover:
+            try:
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[progress.description]{task.description}"),
+                    console=console,
+                ) as progress:
+                    task = progress.add_task("Discovering skills...", total=None)
+                    skills_info = discover_skills_in_repo(source)
+                    progress.update(task, completed=True)
+            except Exception as e:
+                error_msg = str(e)
+                if "rate limit" in error_msg.lower():
+                    console.print("[red]GitHub API rate limit exceeded.[/red]")
+                    console.print("[dim]Set GITHUB_TOKEN or GH_TOKEN environment variable to increase limits.[/dim]")
+                else:
+                    console.print(f"[red]Error discovering skills: {e}[/red]")
+                return 1
+
+            if not skills_info:
+                console.print("[yellow]No skills found in the repository.[/yellow]")
+                return 0
+
+            # Filter skills if --skills is specified
+            if skill_filter:
+                filtered = [s for s in skills_info if s["name"] in skill_filter]
+                if not filtered:
+                    console.print(f"[red]No matching skills found for: {', '.join(skill_filter)}[/red]")
+                    console.print(f"[dim]Available skills: {', '.join(s['name'] for s in skills_info)}[/dim]")
+                    return 1
+                skills_info = filtered
+                console.print(f"[green]✓[/green] Installing {len(skills_info)} selected skill(s)\n")
+            else:
+                console.print(f"[green]✓[/green] Found {len(skills_info)} skills (installing all)\n")
+
+            # Show skills to be installed
+            for skill in skills_info:
+                console.print(f"  • {skill['name']} ({skill['path']})")
+            console.print()
+
+            # Download all skills
             with Progress(
                 SpinnerColumn(),
                 TextColumn("[progress.description]{task.description}"),
                 console=console,
             ) as progress:
-                task = progress.add_task("Downloading skill...", total=None)
-                skill_dir, metadata = download_skill_from_github(url, dest_dir)
+                task = progress.add_task("Downloading skills...", total=None)
+                downloaded = download_multiple_skills(skills_info, dest_dir)
                 progress.update(task, completed=True)
 
-            save_skill_metadata(
-                skill_dir,
-                url,
-                metadata["owner"],
-                metadata["repo"],
-                metadata["branch"],
-                metadata["path"],
-            )
+            console.print(f"[green]✓[/green] Downloaded {len(downloaded)} skills to {dest_dir}\n")
 
-            if not validate_skill(skill_dir):
-                console.print(f"[yellow]Warning: {skill_dir} does not contain SKILL.md, may not be a valid skill[/yellow]")
+            # Save metadata for each
+            for skill_dir, metadata in downloaded:
+                save_skill_metadata(
+                    skill_dir,
+                    metadata["url"],
+                    metadata["owner"],
+                    metadata["repo"],
+                    metadata["branch"],
+                    metadata["path"],
+                )
+        else:
+            # Download single skill
+            try:
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[progress.description]{task.description}"),
+                    console=console,
+                ) as progress:
+                    task = progress.add_task("Downloading skill...", total=None)
+                    skill_dir, metadata = download_skill_from_github(source, dest_dir)
+                    progress.update(task, completed=True)
 
-            console.print(f"[green]✓[/green] Skill downloaded to: {skill_dir}\n")
-            downloaded = [(skill_dir, metadata)]
+                save_skill_metadata(
+                    skill_dir,
+                    source,
+                    metadata["owner"],
+                    metadata["repo"],
+                    metadata["branch"],
+                    metadata["path"],
+                )
 
-        except Exception as e:
-            console.print(f"[red]Download failed: {e}[/red]")
-            return 1
+                if not validate_skill(skill_dir):
+                    console.print(f"[yellow]Warning: {skill_dir} does not contain SKILL.md, may not be a valid skill[/yellow]")
+
+                console.print(f"[green]✓[/green] Skill downloaded to: {skill_dir}\n")
+                downloaded = [(skill_dir, metadata)]
+
+            except Exception as e:
+                console.print(f"[red]Download failed: {e}[/red]")
+                return 1
 
     if skip_deploy:
         console.print("[dim]Skipping deployment (--no-deploy)[/dim]")
@@ -1464,38 +1666,46 @@ def cmd_install_cli(args: argparse.Namespace) -> int:
 
     console.print()
 
-    # Deploy
+    # Deploy and collect deployment info
     project_root = get_project_root() if deployment_type == "project" else None
-    total_success = 0
-    total_fail = 0
+    deployment_details = []  # List of (skill_name, agent_id, target_path)
 
     for skill_dir, _ in downloaded:
-        success_count, fail_count = deploy_skill_to_agents(
-            skill_dir, selected_agents, deployment_type, project_root, use_symlink
-        )
-        total_success += success_count
-        total_fail += fail_count
+        skill_name = skill_dir.name
+        for agent_id in selected_agents:
+            target_path = get_agent_path(agent_id, deployment_type, project_root) / skill_name
+            deployment_details.append((skill_name, agent_id, target_path))
 
-    # Show results
+        deploy_skill_to_agents(skill_dir, selected_agents, deployment_type, project_root, use_symlink)
+
+    # Show detailed results
     console.print()
-    if total_fail == 0:
-        link_type = "symlinked" if use_symlink else "deployed"
-        console.print(
-            Panel.fit(
-                f"[bold green]✓ Installation successful![/bold green]\n\nSkills {link_type} to {total_success} agent(s)",
-                border_style="green",
-            )
-        )
-    else:
-        console.print(
-            Panel.fit(
-                f"[bold yellow]⚠ Installation completed with errors[/bold yellow]\n\n"
-                f"Success: {total_success} | Failed: {total_fail}",
-                border_style="yellow",
-            )
-        )
+    link_type = "symlinked" if use_symlink else "deployed"
 
-    return 0 if total_fail == 0 else 1
+    # Build result table
+    table = Table(title="Installation Summary", show_header=True, header_style="bold cyan")
+    table.add_column("Skill", style="green", no_wrap=True)
+    table.add_column("Agent", style="yellow")
+    table.add_column("Target Path", style="dim", overflow="fold")
+
+    for skill_name, agent_id, target_path in deployment_details:
+        table.add_row(skill_name, get_agent_name(agent_id), str(target_path))
+
+    console.print(table)
+    console.print()
+
+    source_label = str(Path(source).resolve()) if is_local else str(dest_dir)
+    console.print(
+        Panel.fit(
+            f"[bold green]✓ Installation successful![/bold green]\n\n"
+            f"Skills {link_type}: {len(downloaded)}\n"
+            f"Agents: {len(selected_agents)}\n"
+            f"Source: {source_label}",
+            border_style="green",
+        )
+    )
+
+    return 0
 
 
 def cmd_download_cli(args: argparse.Namespace) -> int:
@@ -1535,21 +1745,30 @@ def cmd_download_cli(args: argparse.Namespace) -> int:
     if args.dest:
         dest_dir = args.dest
     else:
-        dest_dir = get_system_temp_dir()
+        dest_dir = get_default_skills_dir()
 
     dest_dir.mkdir(parents=True, exist_ok=True)
     console.print(f"[dim]Download location: {dest_dir}[/dim]\n")
 
     # Discover skills if requested
     if not args.no_discover:
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-        ) as progress:
-            task = progress.add_task("Discovering skills...", total=None)
-            skills_info = discover_skills_in_repo(url)
-            progress.update(task, completed=True)
+        try:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+            ) as progress:
+                task = progress.add_task("Discovering skills...", total=None)
+                skills_info = discover_skills_in_repo(url)
+                progress.update(task, completed=True)
+        except Exception as e:
+            error_msg = str(e)
+            if "rate limit" in error_msg.lower():
+                console.print("[red]GitHub API rate limit exceeded.[/red]")
+                console.print("[dim]Set GITHUB_TOKEN or GH_TOKEN environment variable to increase limits.[/dim]")
+            else:
+                console.print(f"[red]Error discovering skills: {e}[/red]")
+            return 1
 
         if not skills_info:
             console.print("[yellow]No skills found in the repository.[/yellow]")

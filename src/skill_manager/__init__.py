@@ -5,7 +5,7 @@ This package provides functionality to download, deploy, and manage
 skills across different AI agent platforms.
 """
 
-__version__ = "0.2.1"
+__version__ = "0.2.3"
 
 from .agents import AGENTS, detect_existing_agents, get_agent_name, get_agent_path, supports_global_deployment
 from .deployment import (
@@ -20,9 +20,12 @@ from .deployment import (
     update_skill,
 )
 from .github import (
+    discover_local_skills,
     discover_skills_in_repo,
     download_multiple_skills,
     download_skill_from_github,
+    get_default_skills_dir,
+    get_network_info,
     get_system_temp_dir,
     parse_github_url,
 )
@@ -71,6 +74,9 @@ __all__ = [
     "download_skill_from_github",
     "download_multiple_skills",
     "discover_skills_in_repo",
+    "discover_local_skills",
+    "get_default_skills_dir",
+    "get_network_info",
     "get_system_temp_dir",
     "parse_github_url",
     # Metadata

@@ -2,24 +2,145 @@
 """
 GitHub download functionality for skills.
 Handles URL parsing and downloading files/directories from GitHub.
+Supports proxy, GitHub token, and GitHub mirrors.
 """
 
-import tempfile
+import os
 from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
 
+# --- Environment variable keys ---
+# GITHUB_TOKEN / GH_TOKEN: GitHub personal access token
+# HTTP_PROXY / HTTPS_PROXY / ALL_PROXY: Proxy URL (e.g. http://127.0.0.1:7890)
+# GITHUB_MIRROR: GitHub mirror base URL (e.g. https://ghproxy.com/https://github.com)
+#                or API mirror (e.g. https://api.github.com replacement)
+
+# Known GitHub mirror prefixes (prepend to raw github URLs)
+_KNOWN_MIRRORS = [
+    "https://mirror.ghproxy.com",
+    "https://ghproxy.com",
+    "https://gh-proxy.com",
+    "https://github.moeyy.xyz",
+]
+
+
+def _get_proxy_config() -> dict[str, str] | None:
+    """
+    Get proxy configuration from environment variables.
+    Supports HTTP_PROXY, HTTPS_PROXY, ALL_PROXY (case-insensitive).
+
+    Returns:
+        Proxy mapping dict or None
+    """
+    http_proxy = os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy")
+    https_proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
+    all_proxy = os.environ.get("ALL_PROXY") or os.environ.get("all_proxy")
+
+    proxies = {}
+    if http_proxy:
+        proxies["http://"] = http_proxy
+    if https_proxy:
+        proxies["https://"] = https_proxy
+    if all_proxy:
+        if "http://" not in proxies:
+            proxies["http://"] = all_proxy
+        if "https://" not in proxies:
+            proxies["https://"] = all_proxy
+
+    return proxies if proxies else None
+
+
+def _get_github_mirror() -> str | None:
+    """
+    Get GitHub mirror URL from environment variable GITHUB_MIRROR.
+
+    Returns:
+        Mirror base URL or None
+    """
+    return os.environ.get("GITHUB_MIRROR") or os.environ.get("github_mirror")
+
+
+def get_github_headers() -> dict[str, str]:
+    """
+    Get headers for GitHub API requests, including token if available.
+
+    Returns:
+        Dictionary of headers
+    """
+    headers = {"Accept": "application/vnd.github.v3+json"}
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if token:
+        headers["Authorization"] = f"token {token}"
+    return headers
+
+
+def create_http_client(timeout: float = 30.0) -> httpx.Client:
+    """
+    Create an httpx.Client with proxy and auth configuration.
+
+    Args:
+        timeout: Request timeout in seconds
+
+    Returns:
+        Configured httpx.Client
+    """
+    proxies = _get_proxy_config()
+    return httpx.Client(
+        proxy=proxies.get("https://") or proxies.get("http://") if proxies else None,
+        timeout=timeout,
+        follow_redirects=True,
+    )
+
+
+def _apply_mirror_to_url(url: str) -> str:
+    """
+    Apply GitHub mirror prefix to a URL if GITHUB_MIRROR is set.
+
+    Args:
+        url: Original GitHub URL
+
+    Returns:
+        Mirrored URL or original URL
+    """
+    mirror = _get_github_mirror()
+    if not mirror:
+        return url
+
+    mirror = mirror.rstrip("/")
+
+    # If mirror ends with a github.com URL prefix, it's a proxy-style mirror
+    # e.g. https://ghproxy.com/https://github.com -> prepend to raw URLs
+    if mirror.endswith("github.com") or mirror.endswith("raw.githubusercontent.com"):
+        return url  # Don't double-wrap
+
+    # Proxy-style: prepend mirror to the full URL
+    # e.g. https://ghproxy.com/ + https://raw.githubusercontent.com/...
+    return f"{mirror}/{url}"
+
+
+def get_default_skills_dir() -> Path:
+    """
+    Get the default skills directory (~/.skill-manager/).
+    Cross-platform compatible.
+
+    Returns:
+        Path to the default skills directory
+    """
+    return Path.home() / ".skill-manager" / "skills"
+
 
 def get_system_temp_dir() -> Path:
     """
     Get the system temporary directory (cross-platform).
+    Deprecated: Use get_default_skills_dir() instead.
 
     Returns:
         Path to the system temp directory
     """
-    return Path(tempfile.gettempdir()) / "skill-manager"
+    return get_default_skills_dir()
 
 
 def parse_github_url(url: str) -> tuple[str, str, str, str]:
@@ -78,9 +199,18 @@ def get_github_content(owner: str, repo: str, path: str, branch: str = "main") -
     """
     api_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
     params = {"ref": branch}
+    headers = get_github_headers()
 
-    with httpx.Client() as client:
-        response = client.get(api_url, params=params, follow_redirects=True)
+    with create_http_client() as client:
+        response = client.get(api_url, params=params, headers=headers)
+        if response.status_code == 403:
+            remaining = response.headers.get("X-RateLimit-Remaining", "0")
+            if remaining == "0":
+                raise httpx.HTTPStatusError(
+                    "GitHub API rate limit exceeded. Set GITHUB_TOKEN environment variable to increase limits.",
+                    request=response.request,
+                    response=response,
+                )
         response.raise_for_status()
         return response.json()
 
@@ -88,6 +218,7 @@ def get_github_content(owner: str, repo: str, path: str, branch: str = "main") -
 def download_file(url: str, dest_path: Path) -> None:
     """
     Download a single file from a URL.
+    Applies mirror and proxy settings automatically.
 
     Args:
         url: File download URL
@@ -96,8 +227,11 @@ def download_file(url: str, dest_path: Path) -> None:
     Raises:
         httpx.HTTPStatusError: If the download fails
     """
-    with httpx.Client() as client:
-        response = client.get(url, follow_redirects=True)
+    mirrored_url = _apply_mirror_to_url(url)
+    headers = get_github_headers()
+
+    with create_http_client() as client:
+        response = client.get(mirrored_url, headers=headers)
         response.raise_for_status()
         dest_path.parent.mkdir(parents=True, exist_ok=True)
         dest_path.write_bytes(response.content)
@@ -131,6 +265,65 @@ def download_directory(owner: str, repo: str, path: str, dest_dir: Path, branch:
         elif item_type == "dir":
             subdir_dest = dest_dir / item_name
             download_directory(owner, repo, item_path, subdir_dest, branch)
+
+
+def discover_local_skills(local_path: Path) -> list[dict]:
+    """
+    Discover skills in a local directory by scanning for SKILL.md files.
+
+    Args:
+        local_path: Path to local directory to scan
+
+    Returns:
+        List of dicts with keys: name, path (absolute), url (empty)
+    """
+    skills = []
+    if not local_path.is_dir():
+        return skills
+
+    # Check if the directory itself contains SKILL.md
+    if (local_path / "SKILL.md").exists():
+        skills.append(
+            {
+                "name": local_path.name,
+                "path": str(local_path),
+                "url": "",
+                "local": True,
+            }
+        )
+        return skills
+
+    # Scan subdirectories
+    for child in sorted(local_path.iterdir()):
+        if child.is_dir() and (child / "SKILL.md").exists():
+            skills.append(
+                {
+                    "name": child.name,
+                    "path": str(child),
+                    "url": "",
+                    "local": True,
+                }
+            )
+
+    return skills
+
+
+def get_network_info() -> dict[str, str | None]:
+    """
+    Get current network configuration info for display.
+
+    Returns:
+        Dict with proxy, mirror, token status
+    """
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    proxy = _get_proxy_config()
+    mirror = _get_github_mirror()
+
+    return {
+        "token": "***" + token[-4:] if token and len(token) > 4 else ("set" if token else None),
+        "proxy": (proxy.get("https://") or proxy.get("http://")) if proxy else None,
+        "mirror": mirror,
+    }
 
 
 def download_skill_from_github(url: str, dest_dir: Path, progress_callback: Callable | None = None) -> tuple[Path, dict]:
@@ -232,11 +425,11 @@ def _scan_for_skills(
         path: Current path being scanned
         skills: List to append found skills to
         progress_callback: Optional callback for progress updates
+
+    Raises:
+        httpx.HTTPStatusError: If the request fails (including rate limiting)
     """
-    try:
-        content = get_github_content(owner, repo, path, branch)
-    except httpx.HTTPStatusError:
-        return
+    content = get_github_content(owner, repo, path, branch)
 
     if not isinstance(content, list):
         return

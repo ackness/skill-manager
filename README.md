@@ -19,6 +19,7 @@ A comprehensive CLI tool for managing AI agent skills across multiple platforms.
 - ♻️ **Restore** deleted skills from trash
 - 📋 **List** all installed skills with version information
 - ⚡ **CLI-first** - full command-line parameter support for automation
+- 🏎️ **Fast downloads** - 3-tier strategy: git sparse-checkout → Tree API + raw URLs → Contents API fallback
 
 ## Supported AI Agents
 

@@ -5,7 +5,7 @@ This package provides functionality to download, deploy, and manage
 skills across different AI agent platforms.
 """
 
-__version__ = "0.2.3"
+__version__ = "0.3.0"
 
 from .agents import AGENTS, detect_existing_agents, get_agent_name, get_agent_path, supports_global_deployment
 from .deployment import (

@@ -5,7 +5,7 @@ license: MIT
 compatibility: Requires Python 3.13+, uv or rye package manager, internet access for GitHub downloads
 metadata:
   author: ackness
-  version: "0.2.3"
+  version: "0.3.0"
   repository: https://github.com/ackness/skill-manager
   pypi: agent-skill-manager
   platforms:
@@ -22,6 +22,7 @@ A comprehensive CLI tool for managing AI agent skills across multiple platforms.
 ## Key Features
 
 - **Skill Discovery** - Automatically find all SKILL.md files in a GitHub repository
+- **Fast Downloads** - 3-tier download strategy with automatic fallback (git sparse-checkout → Tree API + raw URLs → Contents API)
 - **Symlink Support** - Deploy skills using symlinks to save disk space
 - **CLI-first** - Full command-line parameter support for automation
 - **39 Agents** - Support for all major AI coding assistants
@@ -482,6 +483,7 @@ uv pip install -e .
 ```
 
 ### GitHub download fails
+- The tool automatically falls back through download tiers (git → raw URLs → Contents API)
 - Check internet connection
 - Verify the GitHub URL is correct
 - Ensure the URL points to a directory, not a file
@@ -489,6 +491,7 @@ uv pip install -e .
 - Set `GITHUB_TOKEN` to avoid rate limits: `export GITHUB_TOKEN=ghp_xxx`
 - Use proxy for faster downloads: `export HTTPS_PROXY=http://127.0.0.1:7890`
 - Use mirror for users in China: `export GITHUB_MIRROR=https://mirror.ghproxy.com`
+- If git sparse-checkout fails, ensure git is installed and accessible in PATH
 
 ### Skill not showing in agent
 - Verify the agent is running
@@ -503,6 +506,23 @@ uv pip install -e .
 - Try reinstalling: `sm uninstall` then `sm install`
 
 ## Technical Details
+
+### Download Strategy
+
+The tool uses a 3-tier fallback strategy for optimal download performance:
+
+| Tier | Method | When Used | Speed |
+|------|--------|-----------|-------|
+| 1 | **git sparse-checkout** | Bulk download (`download_multiple_skills`) when git is available | Fastest - single network operation for all skills |
+| 2 | **Tree API + raw URLs** | Single skill or when git fails; uses one API call + raw.githubusercontent.com downloads | Fast - one API call + parallel file downloads |
+| 3 | **Contents API recursive** | Fallback when tree is truncated or raw URLs fail | Slowest - one API call per directory + one download per file |
+
+For single skill downloads (`download_skill_from_github`), only tiers 2 and 3 are used (git clone overhead not worth it for one skill).
+
+Environment variables that affect downloads:
+- `GITHUB_TOKEN` / `GH_TOKEN` - Used for API auth and git clone authentication
+- `GITHUB_MIRROR` - Applied to clone URLs and raw download URLs
+- `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` - Inherited by both httpx client and git subprocesses
 
 ### Metadata Format
 ```json
